@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Capability Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <div class="brand-name">AI Capability Suite</div>
+          <div class="brand-sub">In-Browser · Zero Cloud</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="module-nav">
+        <button class="nav-item active" data-module="hybrid-rag">
+          <span class="nav-icon">01</span>
+          <span>
+            <strong>Hybrid RAG</strong>
+            <small>Vector + BM25 + RRF</small>
+          </span>
+        </button>
+        <button class="nav-item" data-module="agent-system">
+          <span class="nav-icon">02</span>
+          <span>
+            <strong>Agent Orchestration</strong>
+            <small>Plan → Act → Reflect</small>
+          </span>
+        </button>
+        <button class="nav-item" data-module="semantic-cache">
+          <span class="nav-icon">03</span>
+          <span>
+            <strong>Semantic Cache</strong>
+            <small>Cosine interceptor</small>
+          </span>
+        </button>
+        <button class="nav-item" data-module="evals">
+          <span class="nav-icon">04</span>
+          <span>
+            <strong>Evals & Benchmarks</strong>
+            <small>LLM-as-a-Judge</small>
+          </span>
+        </button>
+        <button class="nav-item" data-module="lora">
+          <span class="nav-icon">05</span>
+          <span>
+            <strong>LoRA Pipeline</strong>
+            <small>Adapter fine-tuning</small>
+          </span>
+        </button>
+        <button class="nav-item" data-module="text-to-sql">
+          <span class="nav-icon">06</span>
+          <span>
+            <strong>Text-to-SQL</strong>
+            <small>AST guardrails</small>
+          </span>
+        </button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button class="btn primary demo-launch" id="demo-launch" type="button">
+          ▶ Demo Mode
+        </button>
+        <div class="status-pill">
+          <span class="pulse"></span>
+          Client-side runtime
+        </div>
+        <div class="metric-row">
+          <span>Modules</span>
+          <strong>6 / 6</strong>
+        </div>
+        <div class="demo-kbd muted">Press <kbd>D</kbd> for demo · <kbd>←</kbd><kbd>→</kbd> steps</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="module-title">Hybrid Search RAG</h1>
+          <p id="module-desc">Vector embeddings + BM25 keyword matching fused via Reciprocal Rank Fusion</p>
+        </div>
+        <div class="topbar-metrics" id="global-metrics">
+          <div class="metric-chip"><span>Latency</span><strong id="g-latency">—</strong></div>
+          <div class="metric-chip"><span>Ops</span><strong id="g-ops">0</strong></div>
+          <div class="metric-chip"><span>Cache Hit</span><strong id="g-cache">—</strong></div>
+        </div>
+      </header>
+
+      <!-- MODULE: Hybrid RAG -->
+      <section class="module-panel active" id="panel-hybrid-rag">
+        <div class="panel-grid">
+          <div class="card">
+            <div class="card-head">
+              <h2>Query Corpus</h2>
+              <button class="btn ghost" id="rag-reindex">Rebuild Index</button>
+            </div>
+            <textarea id="rag-query" rows="3" placeholder="Ask a question over the internal docs…">What are the authentication and rate limit policies?</textarea>
+            <div class="control-row">
+              <label>Top-K <input type="number" id="rag-topk" value="5" min="1" max="20" /></label>
+              <label>Vector Weight <input type="range" id="rag-vw" min="0" max="100" value="55" /><span id="rag-vw-val">0.55</span></label>
+              <label>BM25 Weight <input type="range" id="rag-bw" min="0" max="100" value="45" /><span id="rag-bw-val">0.45</span></label>
+              <button class="btn primary" id="rag-search">Run Hybrid Search</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Corpus Preview</h2><span class="badge" id="rag-doc-count">0 docs</span></div>
+            <div class="scroll-list" id="rag-corpus"></div>
+          </div>
+
+          <div class="card span-2">
+            <div class="card-head"><h2>Ranked Results + Citations</h2><span class="badge soft" id="rag-fusion-badge">RRF Fusion</span></div>
+            <div id="rag-results" class="results-list"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Score Breakdown</h2></div>
+            <canvas id="rag-chart" height="180"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Event Log</h2><button class="btn ghost sm" data-clear="rag-log">Clear</button></div>
+            <div class="log-stream" id="rag-log"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE: Agent System -->
+      <section class="module-panel" id="panel-agent-system">
+        <div class="panel-grid">
+          <div class="card">
+            <div class="card-head"><h2>Agent Goal</h2></div>
+            <textarea id="agent-goal" rows="3">Research Q3 revenue drivers, draft a summary, and email the finance team.</textarea>
+            <div class="control-row">
+              <label>Max Steps <input type="number" id="agent-max-steps" value="8" min="3" max="20" /></label>
+              <label class="check"><input type="checkbox" id="agent-hitl" checked /> Require HITL for sensitive tools</label>
+              <button class="btn primary" id="agent-run">Start Cycle</button>
+              <button class="btn ghost" id="agent-stop" disabled>Stop</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>State Graph</h2></div>
+            <div class="state-graph" id="agent-graph">
+              <div class="state-node" data-state="PLAN">PLAN</div>
+              <div class="state-arrow">→</div>
+              <div class="state-node" data-state="ACT">ACT</div>
+              <div class="state-arrow">→</div>
+              <div class="state-node" data-state="REFLECT">REFLECT</div>
+              <div class="state-arrow">↻</div>
+            </div>
+            <div class="metric-row tight"><span>Current</span><strong id="agent-state">IDLE</strong></div>
+            <div class="metric-row tight"><span>Step</span><strong id="agent-step">0</strong></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Registered Tools</h2></div>
+            <div class="tool-list" id="agent-tools"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Step Trace</h2></div>
+            <div class="log-stream" id="agent-trace"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE: Semantic Cache -->
+      <section class="module-panel" id="panel-semantic-cache">
+        <div class="panel-grid">
+          <div class="card">
+            <div class="card-head"><h2>Prompt Interceptor</h2></div>
+            <textarea id="cache-prompt" rows="3" placeholder="Enter a prompt to cache or lookup…">Explain the difference between RAG and fine-tuning.</textarea>
+            <div class="control-row">
+              <label>Similarity θ <input type="range" id="cache-threshold" min="70" max="99" value="85" /><span id="cache-threshold-val">0.85</span></label>
+              <button class="btn primary" id="cache-lookup">Lookup / Cache</button>
+              <button class="btn ghost" id="cache-seed">Seed History</button>
+            </div>
+          </div>
+
+          <div class="card metrics-board">
+            <div class="stat"><span>Hit Rate</span><strong id="cache-hit-rate">0%</strong></div>
+            <div class="stat"><span>$ Saved</span><strong id="cache-saved">$0.00</strong></div>
+            <div class="stat"><span>Latency Saved</span><strong id="cache-latency">0 ms</strong></div>
+            <div class="stat"><span>Entries</span><strong id="cache-entries">0</strong></div>
+          </div>
+
+          <div class="card span-2">
+            <div class="card-head"><h2>Cache Store</h2></div>
+            <div class="scroll-list" id="cache-store"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Hit / Miss Timeline</h2></div>
+            <canvas id="cache-chart" height="160"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Event Log</h2><button class="btn ghost sm" data-clear="cache-log">Clear</button></div>
+            <div class="log-stream" id="cache-log"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE: Evals -->
+      <section class="module-panel" id="panel-evals">
+        <div class="panel-grid">
+          <div class="card">
+            <div class="card-head"><h2>Prompt Log Parser</h2></div>
+            <textarea id="evals-sql" rows="6" class="mono"></textarea>
+            <div class="control-row">
+              <button class="btn primary" id="evals-parse">Parse & Cluster</button>
+              <button class="btn ghost" id="evals-judge">Run LLM-as-a-Judge</button>
+              <button class="btn ghost" id="evals-reset">Reset Dataset</button>
+            </div>
+          </div>
+
+          <div class="card metrics-board">
+            <div class="stat"><span>Prompts</span><strong id="evals-count">0</strong></div>
+            <div class="stat"><span>Clusters</span><strong id="evals-clusters">0</strong></div>
+            <div class="stat"><span>Avg Score</span><strong id="evals-avg">—</strong></div>
+            <div class="stat"><span>Pass Rate</span><strong id="evals-pass">—</strong></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Cluster Distribution</h2></div>
+            <canvas id="evals-cluster-chart" height="180"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Score Regression</h2></div>
+            <canvas id="evals-score-chart" height="180"></canvas>
+          </div>
+
+          <div class="card span-2">
+            <div class="card-head"><h2>Judged Dataset</h2></div>
+            <div class="scroll-list" id="evals-table"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE: LoRA -->
+      <section class="module-panel" id="panel-lora">
+        <div class="panel-grid">
+          <div class="card">
+            <div class="card-head"><h2>LoRA Config</h2><span class="badge soft">4-bit QLoRA sim</span></div>
+            <div class="form-grid">
+              <label>Rank (r) <input type="number" id="lora-r" value="8" min="1" max="64" /></label>
+              <label>Alpha (α) <input type="number" id="lora-alpha" value="16" min="1" max="128" /></label>
+              <label>LR <input type="number" id="lora-lr" value="0.0002" step="0.0001" min="0.00001" /></label>
+              <label>Epochs <input type="number" id="lora-epochs" value="5" min="1" max="20" /></label>
+              <label>Dropout <input type="number" id="lora-dropout" value="0.05" step="0.01" min="0" max="0.5" /></label>
+              <label>Target Modules
+                <select id="lora-targets" multiple size="3">
+                  <option selected>q_proj</option>
+                  <option selected>v_proj</option>
+                  <option>k_proj</option>
+                  <option>o_proj</option>
+                </select>
+              </label>
+            </div>
+            <div class="control-row">
+              <button class="btn primary" id="lora-start">Start Training</button>
+              <button class="btn ghost" id="lora-stop" disabled>Stop</button>
+              <button class="btn ghost" id="lora-merge">Preview Merge</button>
+            </div>
+          </div>
+
+          <div class="card metrics-board">
+            <div class="stat"><span>Epoch</span><strong id="lora-epoch">0</strong></div>
+            <div class="stat"><span>Train Loss</span><strong id="lora-loss">—</strong></div>
+            <div class="stat"><span>Eval Loss</span><strong id="lora-eval">—</strong></div>
+            <div class="stat"><span>Adapter MB</span><strong id="lora-size">—</strong></div>
+          </div>
+
+          <div class="card span-2">
+            <div class="card-head"><h2>Live Loss Curves</h2></div>
+            <canvas id="lora-chart" height="200"></canvas>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Adapter Manager</h2></div>
+            <div class="scroll-list" id="lora-adapters"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Training Log</h2></div>
+            <div class="log-stream" id="lora-log"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE: Text-to-SQL -->
+      <section class="module-panel" id="panel-text-to-sql">
+        <div class="panel-grid">
+          <div class="card">
+            <div class="card-head"><h2>Natural Language → SQL</h2></div>
+            <textarea id="sql-nl" rows="3" placeholder="Ask a question about the sandbox database…">Show average order value by region for customers who spent over $500.</textarea>
+            <div class="control-row">
+              <button class="btn primary" id="sql-generate">Generate SQL</button>
+              <button class="btn ghost" id="sql-validate">Validate AST</button>
+              <button class="btn ghost" id="sql-run">Execute (Sandbox)</button>
+            </div>
+            <label class="block-label">Generated SQL</label>
+            <textarea id="sql-query" rows="5" class="mono"></textarea>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Guardrail Status</h2></div>
+            <div class="guard-status" id="sql-guard">
+              <div class="guard-pill idle">Awaiting validation</div>
+            </div>
+            <div class="metric-row tight"><span>Confidence</span><strong id="sql-confidence">—</strong></div>
+            <div class="metric-row tight"><span>Statement Type</span><strong id="sql-stype">—</strong></div>
+            <div class="metric-row tight"><span>Blocked Ops</span><strong id="sql-blocked">none</strong></div>
+            <div class="schema-box">
+              <h3>Sandbox Schema</h3>
+              <pre id="sql-schema"></pre>
+            </div>
+          </div>
+
+          <div class="card span-2">
+            <div class="card-head"><h2>Query Results</h2></div>
+            <div class="table-wrap" id="sql-results"><p class="muted">Run a read-only query to see results.</p></div>
+          </div>
+
+          <div class="card span-2">
+            <div class="card-head"><h2>AST / Parse Log</h2><button class="btn ghost sm" data-clear="sql-log">Clear</button></div>
+            <div class="log-stream" id="sql-log"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Demo Coach (interview overlay) -->
+  <aside class="demo-coach" id="demo-coach" hidden aria-label="Interview demo coach">
+    <div class="demo-coach-head">
+      <div>
+        <div class="demo-eyebrow">Interview Demo · ~8 min</div>
+        <div class="demo-meta">
+          <span class="badge" id="demo-step-label">Opening</span>
+          <span class="demo-time" id="demo-step-time">~20s</span>
+          <span class="demo-progress-text" id="demo-progress-text">1 / 9</span>
+        </div>
+      </div>
+      <button class="btn ghost sm" id="demo-close" type="button" aria-label="Close demo">✕</button>
+    </div>
+
+    <div class="demo-progress" aria-hidden="true">
+      <div class="demo-progress-fill" id="demo-progress-fill"></div>
+    </div>
+    <div class="demo-dots" id="demo-dots"></div>
+
+    <h2 id="demo-title">Frame the story</h2>
+
+    <div class="demo-section">
+      <h3>Do this</h3>
+      <ol id="demo-do"></ol>
+    </div>
+
+    <div class="demo-section say">
+      <div class="demo-section-head">
+        <h3>Say this</h3>
+        <button class="btn ghost sm" id="demo-copy" type="button">Copy line</button>
+      </div>
+      <blockquote id="demo-say"></blockquote>
+    </div>
+
+    <div class="demo-tip-box">
+      <span>Tip</span>
+      <p id="demo-tip"></p>
+    </div>
+
+    <div class="demo-actions">
+      <button class="btn ghost" id="demo-prev" type="button">Back</button>
+      <button class="btn primary" id="demo-run" type="button">Run this step</button>
+      <button class="btn" id="demo-next" type="button">Next</button>
+    </div>
+  </aside>
+
+  <!-- HITL Modal -->
+  <div class="modal-backdrop" id="hitl-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="hitl-title">
+      <div class="modal-head">
+        <h2 id="hitl-title">Human-in-the-Loop Approval</h2>
+        <span class="badge warn">Sensitive Tool</span>
+      </div>
+      <p id="hitl-body">An agent tool requires your approval before continuing.</p>
+      <pre class="mono" id="hitl-payload"></pre>
+      <div class="modal-actions">
+        <button class="btn danger" id="hitl-deny">Deny</button>
+        <button class="btn primary" id="hitl-approve">Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/modules/hybrid-rag.js"></script>
+  <script src="js/modules/agent-system.js"></script>
+  <script src="js/modules/semantic-cache.js"></script>
+  <script src="js/modules/evals-evaluator.js"></script>
+  <script src="js/modules/lora-pipeline.js"></script>
+  <script src="js/modules/text-to-sql.js"></script>
+  <script src="js/modules/demo-mode.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
