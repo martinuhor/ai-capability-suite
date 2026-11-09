@@ -2,7 +2,7 @@
 
 100% client-side reference implementation of six enterprise AI patterns. No backend, no vector DB, no paid LLM API keys — open in a browser and demo the algorithms.
 
-**Live demo:** after Cloudflare Pages deploy, the URL will be listed here.
+**Live demo:** https://ai-capability-suite.pages.dev/
 
 ## What it is
 
